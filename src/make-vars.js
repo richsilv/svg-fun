@@ -9,12 +9,20 @@ export function makeVars () {
   const numPaths = makeInteger(12, 2)
   const numPoints = makeInteger(16, 8)
   const pointOrderInt = makeInteger(100000000000000)
+  const curvedPath = makeInteger(2)
   const colors = Array(3).fill(0).map(makeColor)
   const lineCount = Math.floor(Math.random() * 10) + 2
+  const fontSize = makeInteger(60, 20)
+  const fontPosition = {
+    x: makeInteger(80, -120),
+    y: makeInteger(120, -80)
+  }
+  const fontColor = mergeColors({ colors, ratio: Math.random() })
   const translate = {
     x: makeInteger(25),
     y: makeInteger(25)
   }
+  const angMult = makeInteger(5, 1)
 
   return {
     colors,
@@ -27,7 +35,12 @@ export function makeVars () {
     numPaths,
     numPoints,
     pointOrderInt,
-    translate
+    curvedPath,
+    translate,
+    angMult,
+    fontSize,
+    fontPosition,
+    fontColor
   }
 }
 
@@ -36,10 +49,37 @@ function makeColor () {
 }
 
 export function makePath (params) {
-  const { pointFunc, numPoints } = params
+  const { pointFunc, numPoints, curvedPath } = params
   const pointOrderInt = params.pointOrderInt % sumFactorials[numPoints - 1]
   const pointOrder = permutation(pointOrderInt)
   const points = pointFunc(params)
+  const pathFunc = curvedPath ? makeCurvePath : makeLinePath
+  const path = pathFunc({ pointOrder, points })
+  return path
+}
+
+function makeLinePath ({ pointOrder, points }) {
+  const firstPointInd = pointOrder.shift()
+  pointOrder.push(firstPointInd)
+  const firstPoint = points[firstPointInd]
+
+  let path = `M ${firstPoint.x},${firstPoint.y}\n`
+
+  const fCInds = pointOrder.splice(0, 2)
+  const fCPoints = fCInds.map((ind) => points[ind])
+  path += `L ${fCPoints[0].x},${fCPoints[0].y} ${fCPoints[1].x},${fCPoints[1].y}\n`
+
+  let nextInd
+  while (pointOrder.length) {
+    nextInd = pointOrder.shift()
+    const nextPoint = points[nextInd]
+    path += `L ${nextPoint.x},${nextPoint.y}\n`
+  }
+
+  return path + 'Z\n'
+}
+
+function makeCurvePath ({ pointOrder, points }) {
   const firstPointInd = pointOrder.shift()
   pointOrder.push(firstPointInd)
   const firstPoint = points[firstPointInd]
@@ -58,28 +98,23 @@ export function makePath (params) {
     path += `S ${nextPoints[0].x},${nextPoints[0].y} ${nextPoints[1].x},${nextPoints[1].y}\n`
   }
 
-  path += 'Z\n'
-  return path
+  return path + 'Z\n'
 }
 
 function makeInteger (max = 100, min = 0) {
   return Math.floor(Math.random() * (max - min)) + min
 }
 
-function normalise (angle) {
-  return angle % (Math.PI / 2)
+export function makeWebFontUrl (fonts) {
+  const font = fonts[makeInteger(fonts.length)]
+  const variant = font.variants[makeInteger(font.variants.length)]
+  const url = `https://fonts.googleapis.com/css?family=${font.family.replace(/ /g, '+')}:${variant}`
+  return { family: font.family, variant, url }
 }
 
 function pointOnEllipse ({ theta = 0, a = 1, b = 1 }) {
-  theta = normalise(theta)
-  const ab = a * b
-  const a2 = Math.pow(a, 2)
-  const b2 = Math.pow(b, 2)
-  const tanTheta2 = Math.pow(Math.tan(theta), 2)
-  let x = ab / Math.pow(b2 + (a2 * tanTheta2), 0.5)
-  if (theta > Math.PI / 2 && theta < (3 * Math.PI / 2)) x = -x
-  let y = ab / Math.pow(a2 + (b2 / tanTheta2), 0.5)
-  if (theta > Math.PI) y = -y
+  const x = a * Math.cos(theta)
+  const y = b * Math.sin(theta)
   return { x, y }
 }
 
@@ -109,10 +144,6 @@ function range (max, { count, inc = 1 }) {
   return Array(count).fill(0).map((_, ind) => ind * inc)
 }
 
-function degToRad (deg) {
-  return deg * Math.PI / 180
-}
-
 function hcd (a, b) {
   const min = Math.min(a, b)
   const maxPotDenom = Math.floor(Math.pow(min, 0.5))
@@ -128,13 +159,10 @@ function mergeColors ({ colors, ratio }) {
     return Math.floor(ratio * parseInt(colors[0].substr(ind, 2), 16) +
       (1 - ratio) * parseInt(colors[1].substr(ind, 2), 16))
   })
-  return colorsMerged.map((colorNum) => colorNum.toString(16)).join('')
+  return colorsMerged.map((colorNum) => pad(colorNum.toString(16), 2)).join('')
 }
 
-function relativePathElement () {
-  return [
-    () => `l ${makeInteger(15)},${makeInteger(15)}`,
-    () => `c ${makeInteger(15)},${makeInteger(15)}, ${makeInteger(15)},${makeInteger(15)} ${makeInteger(15)},${makeInteger(15)}`,
-    () => `s ${makeInteger(15)},${makeInteger(15)} ${makeInteger(15)},${makeInteger(15)}`
-  ][makeInteger(3)]()
+function pad (str, num) {
+  const extra = num -str.length
+  return Array(extra).fill('0').join('') + str
 }
