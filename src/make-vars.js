@@ -1,27 +1,29 @@
-import permutation, { sumFactorials } from './permutation'
+import jsf from 'json-schema-faker'
+import Chance from 'chance'
+import permutation, { factorials } from './permutation'
+import varSchema from './var-config'
+
+const viewBox = [-180, -120, 360, 240]
 
 export function makeVars () {
-  const a = makeInteger(50, 25)
-  const b = makeInteger(50, 25)
+  const a = makeInteger(50, 10)
+  const b = makeInteger(50, 10)
   const l = Math.random()
-  const kd = makeInteger(20, 1)
-  const kn = makeInteger(kd, 1)
+  const k = [makeInteger(20, 1)]
+  k.unshift(makeInteger(k[0], 1))
   const numPaths = makeInteger(12, 2)
   const numPoints = makeInteger(16, 8)
   const pointOrderInt = makeInteger(100000000000000)
   const curvedPath = makeInteger(2)
   const colors = Array(3).fill(0).map(makeColor)
-  const lineCount = Math.floor(Math.random() * 10) + 2
+  const lineCount = makeInteger(2, 11)
   const fontSize = makeInteger(60, 20)
-  const fontPosition = {
-    x: makeInteger(80, -120),
-    y: makeInteger(120, -80)
-  }
-  const fontColor = mergeColors({ colors, ratio: Math.random() })
-  const translate = {
-    x: makeInteger(25),
-    y: makeInteger(25)
-  }
+  const flipX = makeInteger(4)
+  const flipY = makeInteger(4)
+  const fontPositionX = Math.random()
+  const fontPositionY = Math.random()
+  const fontColorRatios1 = Math.random()
+  const fontColorRatios2 = Math.random()
   const angMult = makeInteger(5, 1)
 
   return {
@@ -30,27 +32,34 @@ export function makeVars () {
     a,
     b,
     l,
-    kn,
-    kd,
+    k,
     numPaths,
     numPoints,
     pointOrderInt,
     curvedPath,
-    translate,
     angMult,
     fontSize,
-    fontPosition,
-    fontColor
+    fontPositionX,
+    fontPositionY,
+    fontColorRatios1,
+    fontColorRatios2,
+    flipX,
+    flipY,
+    viewBox
   }
 }
 
 function makeColor () {
-  return Math.floor(Math.random() * Math.pow(16, 6)).toString(16)
+  return pad(Math.floor(Math.random() * Math.pow(16, 6)).toString(16), 6)
+}
+
+function getWord (len) {
+  fetch()
 }
 
 export function makePath (params) {
   const { pointFunc, numPoints, curvedPath } = params
-  const pointOrderInt = params.pointOrderInt % sumFactorials[numPoints - 1]
+  const pointOrderInt = params.pointOrderInt % factorials[numPoints - 1]
   const pointOrder = permutation(pointOrderInt)
   const points = pointFunc(params)
   const pathFunc = curvedPath ? makeCurvePath : makeLinePath
@@ -59,6 +68,7 @@ export function makePath (params) {
 }
 
 function makeLinePath ({ pointOrder, points }) {
+  if (!pointOrder.length) return ''
   const firstPointInd = pointOrder.shift()
   pointOrder.push(firstPointInd)
   const firstPoint = points[firstPointInd]
@@ -67,6 +77,7 @@ function makeLinePath ({ pointOrder, points }) {
 
   const fCInds = pointOrder.splice(0, 2)
   const fCPoints = fCInds.map((ind) => points[ind])
+
   path += `L ${fCPoints[0].x},${fCPoints[0].y} ${fCPoints[1].x},${fCPoints[1].y}\n`
 
   let nextInd
@@ -83,7 +94,6 @@ function makeCurvePath ({ pointOrder, points }) {
   const firstPointInd = pointOrder.shift()
   pointOrder.push(firstPointInd)
   const firstPoint = points[firstPointInd]
-
   let path = `M ${firstPoint.x},${firstPoint.y}\n`
 
   const fCInds = pointOrder.splice(0, 3)
@@ -118,19 +128,19 @@ function pointOnEllipse ({ theta = 0, a = 1, b = 1 }) {
   return { x, y }
 }
 
-function pointOnSpirograph ({ theta = 0, R = 1, kn = 1, kd = 2, l = 0.5, ratio = 0, colors }) {
-  const k = kn / kd
-  const kFactor = (1 - k) / k
-  const x = R * (((1 - k) * Math.cos(theta)) + (l * k * Math.cos(kFactor * theta)))
-  const y = R * (((1 - k) * Math.sin(theta)) + (l * k * Math.sin(kFactor * theta)))
+function pointOnSpirograph ({ theta = 0, R = 1, k = [1, 2], l = 0.5, ratio = 0, colors }) {
+  const kRatio = k[0] / k[1]
+  const kFactor = (1 - kRatio) / kRatio
+  const x = R * (((1 - kRatio) * Math.cos(theta)) + (l * kRatio * Math.cos(kFactor * theta)))
+  const y = R * (((1 - kRatio) * Math.sin(theta)) + (l * kRatio * Math.sin(kFactor * theta)))
   const color = mergeColors({ colors, ratio })
   return { x, y, theta, color }
 }
 
-export function makeSpirograph ({ R, kn, kd, l, numPoints, colors = ['000000', 'ffffff'] }) {
-  const timesRound = kn / hcd(kn, kd)
+export function makeSpirograph ({ R, k, l, numPoints, colors = ['000000', 'ffffff'] }) {
+  const timesRound = k[0] / hcd(k[0], k[1])
   const angles = range(Math.PI * 2 * timesRound, { count: numPoints })
-  return angles.map((theta, ind) => pointOnSpirograph({ theta, R, kn, kd, l, colors, ratio: ind / numPoints }))
+  return angles.map((theta, ind) => pointOnSpirograph({ theta, R, k, l, colors, ratio: ind / numPoints }))
 }
 
 export function makeEllipse ({ a, b, numPoints }) {
@@ -154,7 +164,8 @@ function hcd (a, b) {
   return maxDenom
 }
 
-function mergeColors ({ colors, ratio }) {
+export function mergeColors ({ colors, ratio }) {
+  if (!colors) return 'ffffff'
   const colorsMerged = [0, 2, 4].map((ind) => {
     return Math.floor(ratio * parseInt(colors[0].substr(ind, 2), 16) +
       (1 - ratio) * parseInt(colors[1].substr(ind, 2), 16))
@@ -163,6 +174,6 @@ function mergeColors ({ colors, ratio }) {
 }
 
 function pad (str, num) {
-  const extra = num -str.length
+  const extra = num - str.length
   return Array(extra).fill('0').join('') + str
 }
