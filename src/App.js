@@ -89,8 +89,13 @@ class App extends React.Component {
     return (val) => this.setState({ [field]: val })
   }
 
+  onChange = ({ formData }) => {
+    this.setState(formData)
+  }
+
   render () {
     const state = { ...this.state }
+    const { onChange } = this
     if (!state.colors) return null
     state.path = makePath({ ...state, pointFunc: makeEllipse })
     state.fontColors = state.fontColorRatios.map((ratio) => mergeColors({ colors: state.colors, ratio }))
@@ -101,12 +106,7 @@ class App extends React.Component {
           <Logo state={state} setTextNode={this.setTextNode} />
         </div>
         <div style={{ flex: '1 0 40%' }} className='bg-red'>
-          <Form schema={schema} uiSchema={uiSchema} formData={state}><div /></Form>
-          <div className='w-50 mw5'>
-            <SliderInput onChange={this.makeOnChange('pointOrderInt')} defaultValue={100000} label='Point Order Integer' value={this.state.pointOrderInt} step={1} min={0} max={100000000000000} />
-            <SliderInput onChange={this.makeOnChange('numPaths')} defaultValue={100000} label='Number of shapes' value={this.state.numPaths} step={1} min={2} max={12} />
-            <SliderInput onChange={this.makeOnChange('numPoints')} defaultValue={100000} label='Number of points on shape' value={this.state.numPoints} step={1} min={8} max={16} />
-          </div>
+          <Form schema={schema} uiSchema={uiSchema} formData={state} onChange={onChange}><div /></Form>
         </div>
         <div className='button-section'>
           <button onClick={this.makeVars}>New SVG</button>
@@ -140,7 +140,7 @@ const Logo = ({ state, setTextNode }) => {
 
   const style = {
     fontFamily: font.family,
-    textShadow: `0 0 4px #${colors[1]}`
+    textShadow: `0 0 4px ${colors[1]}`
   }
   if (isNaN(parseInt(font.variant, 10))) style.fontStyle = font.variant
   else style.fontWeight = font.variant
@@ -169,7 +169,7 @@ const Logo = ({ state, setTextNode }) => {
       <text
         id='logo-text'
         fontSize={fontSize}
-        fill={`#${colors[0]}`}
+        fill={`${colors[0]}`}
         style={style}
         ref={setTextNode}
         transform={`matrix(1 0 0 1 ${fontCoords.x} ${fontCoords.y})`}>

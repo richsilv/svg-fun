@@ -10,7 +10,7 @@ export const schema = {
       type: 'array',
       items: {
         type: 'string',
-        pattern: '^[0-9a-fA-F]{6}$',
+        pattern: '^#[0-9a-fA-F]{6}$',
         chance: {
           color: {
             format: 'hex'
@@ -207,7 +207,6 @@ export const uiSchema ={
 
 export default function makeVars () {
   const vars = jsf(schema)
-  vars.colors = vars.colors.map((c) => c.substring(1))
   vars.k = vars.k.sort((a, b) => a - b)
   vars.viewBox = viewBox
   return vars

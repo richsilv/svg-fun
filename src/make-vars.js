@@ -165,7 +165,8 @@ function hcd (a, b) {
 }
 
 export function mergeColors ({ colors, ratio }) {
-  if (!colors) return 'ffffff'
+  if (!colors) return '#ffffff'
+  colors = colors.map((c) => c[0] === '#' ? c.substring(1) : c)
   const colorsMerged = [0, 2, 4].map((ind) => {
     return Math.floor(ratio * parseInt(colors[0].substr(ind, 2), 16) +
       (1 - ratio) * parseInt(colors[1].substr(ind, 2), 16))
