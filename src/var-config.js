@@ -1,4 +1,5 @@
 import jsf from 'json-schema-faker'
+import { randomWord } from './make-vars'
 
 export const viewBox = [-180, -120, 360, 240]
 
@@ -33,8 +34,8 @@ export const schema = {
       default: 30
     },
     l: {
-      minimum: 0,
-      maximum: 1,
+      minimum: 0.0,
+      maximum: 1.0,
       multipleOf: 0.0000001,
       type: 'number',
       default: 0.5
@@ -97,19 +98,20 @@ export const schema = {
       properties: {
         x: {
           type: 'number',
-          maximum: 1,
-          minimum: 0,
+          maximum: 1.0,
+          minimum: 0.0,
           multipleOf: 0.0000001,
           default: 0.5
         },
         y: {
           type: 'number',
-          maximum: 1,
-          minimum: 0,
+          maximum: 1.0,
+          minimum: 0.0,
           multipleOf: 0.0000001,
           default: 0.5
         }
-      }
+      },
+      required: ['x', 'y']
     },
     angMult: {
       type: 'integer',
@@ -121,8 +123,8 @@ export const schema = {
       type: 'array',
       items: {
         type: 'number',
-        maximum: 1,
-        minimum: 0,
+        maximum: 1.0,
+        minimum: 0.0,
         multipleOf: 0.0000001,
         default: 0.5
       },
@@ -144,7 +146,8 @@ export const schema = {
           default: 1,
           type: 'integer'
         }
-      }
+      },
+      required: ['x', 'y']
     }
   },
   required: [
@@ -193,8 +196,8 @@ export const uiSchema ={
   },
   angMult: { 'ui:widget': 'range' },
   fontColorRatios: {
-    items: { 
-      'ui:widget': 'range' 
+    items: {
+      'ui:widget': 'range'
     },
     addable: false,
     removable: false
@@ -209,5 +212,8 @@ export default function makeVars () {
   const vars = jsf(schema)
   vars.k = vars.k.sort((a, b) => a - b)
   vars.viewBox = viewBox
-  return vars
+  return randomWord().then((word) => {
+    vars.name = word
+    return vars
+  })
 }

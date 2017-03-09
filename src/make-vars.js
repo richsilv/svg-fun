@@ -178,3 +178,8 @@ function pad (str, num) {
   const extra = num - str.length
   return Array(extra).fill('0').join('') + str
 }
+
+export function randomWord (len) {
+  return window.fetch(`http://www.setgetgo.com/randomword/get.php${len ? `?len=${len}` : ''}`)
+    .then((res) => res.text())
+}

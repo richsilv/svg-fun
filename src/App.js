@@ -1,5 +1,6 @@
 import 'tachyons/css/tachyons.css'
 import qs from 'querystring'
+import eql from 'deep-eql'
 import { makePath, makeEllipse, makeSpirograph, makeWebFontUrl, mergeColors } from './make-vars'
 import makeVars, { schema, uiSchema } from './var-config'
 
@@ -48,41 +49,24 @@ class App extends React.Component {
   }
 
   componentDidMount () {
-    this.storeTextSize()
-    document.fonts.onloadingdone = () => this.storeTextSize()
     this.readState()
   }
 
-  componentDidUpdate () {
-    this.storeTextSize()
-  }
-
-  setTextNode = (c) => { this.textNode = c }
-
-  storeTextSize = () => {
-    setTimeout(() => {
-      const { textNode } = this
-      if (!textNode) return
-      const textSize = {
-        x: textNode.scrollWidth,
-        y: textNode.scrollHeight
-      }
-      if (textSize.x === this.state.textSize.x && textSize.y === this.state.textSize.y) return
-      this.setState({ textSize })
-    }, 0)
-  }
-
   makeVars = (cb) => {
-    const vars = makeVars()
     const font = makeWebFontUrl(this.fonts)
-
-    this.setState({
-      font,
-      ...vars
-    }, () => {
-      this.writeState()
-      typeof cb === 'function' && cb()
-    })
+    makeVars()
+      .then((vars) => {
+        this.setState({
+          font,
+          ...vars
+        }, () => {
+          this.writeState()
+          typeof cb === 'function' && cb()
+        })
+      })
+      .catch((err) => {
+        console.error('Error making variables', err)
+      })
   }
 
   makeOnChange = (field) => {
@@ -128,55 +112,97 @@ const SliderInput = (props) => {
   )
 }
 
-const Logo = ({ state, setTextNode }) => {
-  const { viewBox, path, colors, k, l, numPaths, angMult, flipX, flipY, font, fontSize, fontPositionX, fontPositionY, textSize } = state
-  const fontPosition = { x: fontPositionX, y: fontPositionY }
-  if (!path) return null
-  const spirograph = makeSpirograph({ R: 70, k, l, numPoints: numPaths, colors })
-  const fontCoords = ['x', 'y'].reduce((coords, axis, ind) => {
-    coords[axis] = (viewBox[ind + 2] - textSize[axis]) * fontPosition[axis] + viewBox[ind]
-    return coords
-  }, {})
-
-  const style = {
-    fontFamily: font.family,
-    textShadow: `0 0 4px ${colors[1]}`
+class Logo extends React.Component {
+  state = {
+    x: 0,
+    y: 0,
+    bBox: { height: 0, width: 0, x: 0, y: 0 }
   }
-  if (isNaN(parseInt(font.variant, 10))) style.fontStyle = font.variant
-  else style.fontWeight = font.variant
 
-  return (
-    <svg style={{ width: '100%' }} viewBox={viewBox.join(' ')}>
-      <defs>
-        <style type='text/css'>
-          @import url({font.url});
-        </style>
-      </defs>
-      {spirograph.map(({ theta, x, y, color }, ind) => {
-        const cosT = Math.cos(theta)
-        const sinT = Math.sin(theta)
-        const cosMT = Math.cos(theta * angMult)
-        const sinMT = Math.sin(theta * angMult)
-        const _flipX = ind % flipX ? -1 : 1
-        const _flipY = ind % flipY ? -1 : 1
-        const matrix = `matrix(${cosMT * _flipX} ${sinMT * _flipY} ${-sinMT * _flipX} ${cosMT * _flipY} 0 0)`
-        return (
-          <g key={ind} transform={`matrix(${cosT} ${sinT} ${-sinT} ${cosT} ${x} ${y})`}>
-            <path d={path} stroke='none' fill={`#${color}`} transform={matrix} />
-          </g>
-        )
-      })}
-      <text
-        id='logo-text'
-        fontSize={fontSize}
-        fill={`${colors[0]}`}
-        style={style}
-        ref={setTextNode}
-        transform={`matrix(1 0 0 1 ${fontCoords.x} ${fontCoords.y})`}>
-        Foobar
-      </text>
-    </svg>
-  )
+  componentDidMount () {
+    this.storeTextSize()
+    document.fonts.onloadingdone = () => this.storeTextSize()
+  }
+
+  componentDidUpdate () {
+    this.storeTextSize()
+  }
+
+  setTextNode = (c) => { this.textNode = c }
+
+  storeTextSize = () => {
+    setTimeout(() => {
+      const { textNode } = this
+      if (!textNode) return
+      const bBox = textNode.getBBox()
+      if (eql(this.state.bBox, bBox)) return
+      this.setState({ bBox })
+    }, 0)
+  }
+
+  render () {
+    const { bBox } = this.state
+    const { state } = this.props
+    const { viewBox, path, colors, k, l, numPaths, angMult, flipX, flipY, font, fontSize, fontPosition, name } = state
+    const { setTextNode } = this
+    if (!path) return null
+    const spirograph = makeSpirograph({ R: 70, k, l, numPoints: numPaths, colors })
+    const fontCoords = {
+      x: (viewBox[2] - bBox.width) * fontPosition.x + viewBox[0] - bBox.x,
+      y: (viewBox[3] - bBox.height) * fontPosition.y + viewBox[1] - bBox.y
+    }
+
+    const style = {
+      fontFamily: font.family,
+      textShadow: `0 0 4px ${colors[1]}`
+    }
+    if (isNaN(parseInt(font.variant, 10))) style.fontStyle = font.variant
+    else style.fontWeight = font.variant
+
+    return (
+      <svg className='ba' style={{ width: '100%' }} viewBox={viewBox.join(' ')}>
+        <defs>
+          <style type='text/css'>
+            {false ? '' : `@import url(${font.url});`}
+          </style>
+        </defs>
+        {spirograph.map(({ theta, x, y, color }, ind) => {
+          const cosT = Math.cos(theta)
+          const sinT = Math.sin(theta)
+          const cosMT = Math.cos(theta * angMult)
+          const sinMT = Math.sin(theta * angMult)
+          const _flipX = ind % flipX ? -1 : 1
+          const _flipY = ind % flipY ? -1 : 1
+          const matrix = `matrix(${cosMT * _flipX} ${sinMT * _flipY} ${-sinMT * _flipX} ${cosMT * _flipY} 0 0)`
+          return (
+            <g key={ind} transform={`matrix(${cosT} ${sinT} ${-sinT} ${cosT} ${x} ${y})`}>
+              <path d={path} stroke='none' fill={`#${color}`} transform={matrix} />
+            </g>
+          )
+        })}
+        <text
+          id='logo-text'
+          fontSize={fontSize}
+          fill={`${colors[0]}`}
+          style={style}
+          ref={setTextNode}
+          transform={`matrix(1 0 0 1 ${fontCoords.x} ${fontCoords.y})`}>
+          {name}
+        </text>
+      </svg>
+    )
+  }
 }
 
 export default App
+
+function CustomFieldTemplate ({ id, classNames, label, help, required, description, children }) {
+  return (
+    <div className={`${classNames}`}>
+      <label htmlFor={id}>{label}{required ? "*" : null}</label>
+      {description}
+      {children}
+      {help}
+    </div>
+  )
+}
