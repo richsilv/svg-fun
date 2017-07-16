@@ -5,58 +5,6 @@ import varSchema from './var-config'
 
 const viewBox = [-180, -120, 360, 240]
 
-export function makeVars () {
-  const a = makeInteger(50, 10)
-  const b = makeInteger(50, 10)
-  const l = Math.random()
-  const k = [makeInteger(20, 1)]
-  k.unshift(makeInteger(k[0], 1))
-  const numPaths = makeInteger(12, 2)
-  const numPoints = makeInteger(16, 8)
-  const pointOrderInt = makeInteger(100000000000000)
-  const curvedPath = makeInteger(2)
-  const colors = Array(3).fill(0).map(makeColor)
-  const lineCount = makeInteger(2, 11)
-  const fontSize = makeInteger(60, 20)
-  const flipX = makeInteger(4)
-  const flipY = makeInteger(4)
-  const fontPositionX = Math.random()
-  const fontPositionY = Math.random()
-  const fontColorRatios1 = Math.random()
-  const fontColorRatios2 = Math.random()
-  const angMult = makeInteger(5, 1)
-
-  return {
-    colors,
-    lineCount,
-    a,
-    b,
-    l,
-    k,
-    numPaths,
-    numPoints,
-    pointOrderInt,
-    curvedPath,
-    angMult,
-    fontSize,
-    fontPositionX,
-    fontPositionY,
-    fontColorRatios1,
-    fontColorRatios2,
-    flipX,
-    flipY,
-    viewBox
-  }
-}
-
-function makeColor () {
-  return pad(Math.floor(Math.random() * Math.pow(16, 6)).toString(16), 6)
-}
-
-function getWord (len) {
-  fetch()
-}
-
 export function makePath (params) {
   const { pointFunc, numPoints, curvedPath } = params
   const pointOrderInt = params.pointOrderInt % factorials[numPoints - 1]
@@ -111,7 +59,7 @@ function makeCurvePath ({ pointOrder, points }) {
   return path + 'Z\n'
 }
 
-function makeInteger (max = 100, min = 0) {
+export function makeInteger (max = 100, min = 0) {
   return Math.floor(Math.random() * (max - min)) + min
 }
 
@@ -171,7 +119,7 @@ export function mergeColors ({ colors, ratio }) {
     return Math.floor(ratio * parseInt(colors[0].substr(ind, 2), 16) +
       (1 - ratio) * parseInt(colors[1].substr(ind, 2), 16))
   })
-  return colorsMerged.map((colorNum) => pad(colorNum.toString(16), 2)).join('')
+  return '#' + colorsMerged.map((colorNum) => pad(colorNum.toString(16), 2)).join('')
 }
 
 function pad (str, num) {
@@ -182,4 +130,5 @@ function pad (str, num) {
 export function randomWord (len) {
   return window.fetch(`http://www.setgetgo.com/randomword/get.php${len ? `?len=${len}` : ''}`)
     .then((res) => res.text())
+    .catch(() => 'Placeholder')
 }

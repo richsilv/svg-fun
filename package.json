@@ -15,11 +15,13 @@
     "chance": "^1.0.4",
     "deep-eql": "^2.0.1",
     "json-schema-faker": "^0.4.0",
+    "lodash.merge": "^4.6.0",
     "querystring": "^0.2.0",
     "rc-slider": "^6.1.0",
     "react": "^15.4.2",
     "react-dom": "^15.4.2",
-    "react-jsonschema-form": "^0.42.0",
+    "react-draggable": "^2.2.3",
+    "react-jsonschema-form": "^0.48.2",
     "tachyons": "^4.6.2"
   },
   "devDependencies": {

@@ -1,11 +1,13 @@
 import 'tachyons/css/tachyons.css'
 import qs from 'querystring'
 import eql from 'deep-eql'
-import { makePath, makeEllipse, makeSpirograph, makeWebFontUrl, mergeColors } from './make-vars'
-import makeVars, { schema, uiSchema } from './var-config'
+import Draggable from 'react-draggable'
+import merge from 'lodash.merge'
+import { makePath, makeEllipse, makeSpirograph, mergeColors } from './make-vars'
+import makeVars, { schema, uiSchema, makeWebFontUrl } from './var-config'
+import { FieldTemplate } from './form-components'
 
-import Slider, { Range } from 'rc-slider'
-import Form from "react-jsonschema-form"
+import Form from 'react-jsonschema-form'
 import 'rc-slider/assets/index.css'
 
 import React from 'react'
@@ -13,24 +15,33 @@ import React from 'react'
 const apiKey = 'AIzaSyAicnK08BLBUTza7RBszpFmaNw6WQWamcg'
 
 class App extends React.Component {
-  state = {
-    textSize: { x: 80, y: 20 }
-  }
-
-  fonts = []
+  state = {}
 
   componentWillMount () {
-    fetch(`https://www.googleapis.com/webfonts/v1/webfonts?key=${apiKey}`)
+    window.fetch(`https://www.googleapis.com/webfonts/v1/webfonts?key=${apiKey}`)
       .then((res) => res.json())
       .then((json) => {
-        this.fonts = json.items
-        if (!this.readState()) this.makeVars()
+        this.setState({ fonts: json.items })
       })
       .catch((err) => {
         console.error('Could not fetch Google Fonts', err)
-        this.fonts = [{ family: 'sans-serif', variants: ['regular'] }]
-        if (!this.readState()) this.makeVars()
+        this.setState({ fonts: [{ family: 'sans-serif', variants: ['regular'] }] })
       })
+  }
+
+  render () {
+    const { fonts } = this.state
+    if (!fonts) return null
+
+    return <Page fonts={fonts} />
+  }
+}
+
+export default App
+
+class Page extends React.Component {
+  state = {
+    repositioned: false
   }
 
   writeState = () => {
@@ -49,17 +60,13 @@ class App extends React.Component {
   }
 
   componentDidMount () {
-    this.readState()
+    if (!this.readState()) this.makeVars()
   }
 
   makeVars = (cb) => {
-    const font = makeWebFontUrl(this.fonts)
-    makeVars()
+    makeVars(this.props)
       .then((vars) => {
-        this.setState({
-          font,
-          ...vars
-        }, () => {
+        this.setState({ ...vars, repositioned: false }, () => {
           this.writeState()
           typeof cb === 'function' && cb()
         })
@@ -69,93 +76,155 @@ class App extends React.Component {
       })
   }
 
-  makeOnChange = (field) => {
-    return (val) => this.setState({ [field]: val })
+  onChange = (data) => {
+    this.setState((s) => merge(s, data))
   }
 
-  onChange = ({ formData }) => {
-    this.setState(formData)
+  onResetPositioning = () => {
+    this.setState({ repositioned: true })
   }
 
   render () {
-    const state = { ...this.state }
+    const data = { ...this.state }
+    const { fonts } = this.props
     const { onChange } = this
-    if (!state.colors) return null
-    state.path = makePath({ ...state, pointFunc: makeEllipse })
-    state.fontColors = state.fontColorRatios.map((ratio) => mergeColors({ colors: state.colors, ratio }))
+    if (!data.colors) return null
+    data.graphic.path = makePath({ ...data.graphic, pointFunc: makeEllipse })
+    data.text.textColors = data.text.textColorRatios.map((ratio) => mergeColors({ colors: data.colors, ratio }))
 
     return (
       <div className='App flex flex-row flex-wrap'>
         <div style={{ flex: '0 1 60%', minWidth: '600px' }}>
-          <Logo state={state} setTextNode={this.setTextNode} />
+          <Logo data={data} onChange={onChange} repositioned={this.state.repositioned} />
+          <div className='button-section'>
+            <button onClick={this.makeVars} className='f6 link dim br3 ba bw1 ph3 pv2 mb2 dib dark-gray bg-transparent b--dark-gray'>New SVG</button>
+          </div>
         </div>
-        <div style={{ flex: '1 0 40%' }} className='bg-red'>
-          <Form schema={schema} uiSchema={uiSchema} formData={state} onChange={onChange}><div /></Form>
-        </div>
-        <div className='button-section'>
-          <button onClick={this.makeVars}>New SVG</button>
+        <div style={{ flex: '1 0 40%' }} className='bg-red vh-100 overflow-scroll'>
+          <Form
+            schema={schema(fonts, data.text.font.family)}
+            uiSchema={uiSchema}
+            formData={data}
+            onChange={({ formData }) => onChange(formData)}
+            FieldTemplate={FieldTemplate}>
+            <div />
+          </Form>
         </div>
       </div>
     )
   }
 }
 
-const SliderInput = (props) => {
-  let { onChange, label, value, defaultValue } = props
-
-  return (
-    <div className='pv1 ph2 ba bw1 b--dotted ma1'>
-      <label htmlFor={label} className='db mb2'>{label}</label>
-      <input name={label} className='w-100 input-reset' type='number' defaultValue={defaultValue} value={value} onChange={(evt) => onChange(parseInt(evt.target.value, 10))} />
-      <Slider className='mt2' {...props} />
-    </div>
-  )
-}
-
 class Logo extends React.Component {
   state = {
-    x: 0,
-    y: 0,
-    bBox: { height: 0, width: 0, x: 0, y: 0 }
+    graphic: {
+      x: 0,
+      y: 0,
+      bBox: { height: 0, width: 0, x: 0, y: 0 }
+    },
+    text: {
+      x: 0,
+      y: 0,
+      bBox: { height: 0, width: 0, x: 0, y: 0 }
+    }
   }
 
   componentDidMount () {
-    this.storeTextSize()
-    document.fonts.onloadingdone = () => this.storeTextSize()
+    this.storeSizes()
+    document.fonts.onloadingdone = this.storeSizes
   }
 
   componentDidUpdate () {
-    this.storeTextSize()
+    this.storeSizes()
   }
 
+  setGraphicNode = (c) => { this.graphicNode = c }
   setTextNode = (c) => { this.textNode = c }
 
+  storeSizes = () => {
+    return Promise.all([this.storeGraphicSize(), this.storeTextSize()])
+      .then(([graphicBBox, textBBox]) => {
+        console.log(graphicBBox.width)
+        if (this.props.repositioned) return
+        const { graphic } = this.state
+        graphic.scale = 180 / graphicBBox.width
+        this.setState({ graphic })
+      })
+      .catch((err) => console.error(err))
+  }
+
+  storeGraphicSize = () => {
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        const { graphicNode } = this
+        if (!graphicNode) return
+        const bBox = graphicNode.getBBox()
+        if (eql(this.state.graphic.bBox, bBox)) return
+        this.setState((state) => {
+          Object.assign(state.graphic, { bBox })
+          return state
+        }, () => resolve(bBox))
+      }, 0)
+    })
+  }
+
   storeTextSize = () => {
-    setTimeout(() => {
-      const { textNode } = this
-      if (!textNode) return
-      const bBox = textNode.getBBox()
-      if (eql(this.state.bBox, bBox)) return
-      this.setState({ bBox })
-    }, 0)
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        const { textNode } = this
+        if (!textNode) return
+        const bBox = textNode.getBBox()
+        if (eql(this.state.text.bBox, bBox)) return
+        this.setState((state) => {
+          Object.assign(state.text, { bBox })
+          return state
+        }, () => resolve(bBox))
+      }, 0)
+    })
+  }
+
+  getCoords = (position, elementName) => {
+    const { viewBox } = this.props.data
+    const bBox = this.state[elementName].bBox
+
+    return {
+      x: (viewBox[2] - bBox.width) * position.x + viewBox[0] - bBox.x,
+      y: (viewBox[3] - bBox.height) * position.y + viewBox[1] - bBox.y
+    }
+  }
+
+  updatePosition = (elementName) => (_, { x, y }) => {
+    const { onChange, data: { viewBox } } = this.props
+    const bBox = this.state[elementName].bBox
+    const newPosition = {
+      x: (x - viewBox[0] + bBox.x) / (viewBox[2] - bBox.width),
+      y: (y - viewBox[1] + bBox.y) / (viewBox[3] - bBox.height)
+    }
+
+    onChange({ [elementName]: { position: newPosition } })
   }
 
   render () {
-    const { bBox } = this.state
-    const { state } = this.props
-    const { viewBox, path, colors, k, l, numPaths, angMult, flipX, flipY, font, fontSize, fontPosition, name } = state
-    const { setTextNode } = this
+    const data = { ...this.props.data }
+    data.graphic = { ...data.graphic, scale: data.graphic.scale * this.state.graphic.scale }
+    const { viewBox, colors } = data
+    const { path, k, l, numPaths } = data.graphic
+    const { font, textColors, name, textTransform, letterSpacing } = data.text
+    const { setTextNode, setGraphicNode, getCoords, updatePosition } = this
     if (!path) return null
+
     const spirograph = makeSpirograph({ R: 70, k, l, numPoints: numPaths, colors })
-    const fontCoords = {
-      x: (viewBox[2] - bBox.width) * fontPosition.x + viewBox[0] - bBox.x,
-      y: (viewBox[3] - bBox.height) * fontPosition.y + viewBox[1] - bBox.y
-    }
+    const graphicCoords = getCoords(data.graphic.position, 'graphic')
+    const textCoords = getCoords(data.text.position, 'text')
 
     const style = {
       fontFamily: font.family,
-      textShadow: `0 0 4px ${colors[1]}`
+      userSelect: 'none',
+      textTransform,
+      letterSpacing
+      // textShadow: `0 0 4px ${colors[1]}`
     }
+
     if (isNaN(parseInt(font.variant, 10))) style.fontStyle = font.variant
     else style.fontWeight = font.variant
 
@@ -163,10 +232,35 @@ class Logo extends React.Component {
       <svg className='ba' style={{ width: '100%' }} viewBox={viewBox.join(' ')}>
         <defs>
           <style type='text/css'>
-            {false ? '' : `@import url(${font.url});`}
+            @import url({makeWebFontUrl(font)})
           </style>
         </defs>
+        <LogoGraphic {...data.graphic} spirograph={spirograph} setGraphicNode={setGraphicNode} graphicCoords={graphicCoords} onDrag={updatePosition('graphic')} />
+        <LogoText {...data.text} color={textColors[0]} style={style} setTextNode={setTextNode} textCoords={textCoords} name={name} onDrag={updatePosition('text')} />
+      </svg>
+    )
+  }
+}
+
+const LogoText = ({ fontSize, color, style, setTextNode, textCoords, name, onDrag }) => (
+  <Draggable position={textCoords} onDrag={onDrag}>
+    <text
+      id='logo-text'
+      fontSize={fontSize}
+      fill={`${color}`}
+      style={style}
+      ref={setTextNode}>
+      {name}
+    </text>
+  </Draggable>
+)
+
+const LogoGraphic = ({ spirograph, flipX, flipY, setGraphicNode, graphicCoords, path, scale, angMult, onDrag }) => (
+  <Draggable position={graphicCoords} onDrag={onDrag}>
+    <g ref={setGraphicNode}>
+      <g transform={`matrix(${scale} 0 0 ${scale} 0 0)`}>
         {spirograph.map(({ theta, x, y, color }, ind) => {
+          if (!ind) console.log('Scale', scale)
           const cosT = Math.cos(theta)
           const sinT = Math.sin(theta)
           const cosMT = Math.cos(theta * angMult)
@@ -176,33 +270,11 @@ class Logo extends React.Component {
           const matrix = `matrix(${cosMT * _flipX} ${sinMT * _flipY} ${-sinMT * _flipX} ${cosMT * _flipY} 0 0)`
           return (
             <g key={ind} transform={`matrix(${cosT} ${sinT} ${-sinT} ${cosT} ${x} ${y})`}>
-              <path d={path} stroke='none' fill={`#${color}`} transform={matrix} />
+              <path d={path} stroke='none' fill={`${color}`} transform={matrix} />
             </g>
           )
         })}
-        <text
-          id='logo-text'
-          fontSize={fontSize}
-          fill={`${colors[0]}`}
-          style={style}
-          ref={setTextNode}
-          transform={`matrix(1 0 0 1 ${fontCoords.x} ${fontCoords.y})`}>
-          {name}
-        </text>
-      </svg>
-    )
-  }
-}
-
-export default App
-
-function CustomFieldTemplate ({ id, classNames, label, help, required, description, children }) {
-  return (
-    <div className={`${classNames}`}>
-      <label htmlFor={id}>{label}{required ? "*" : null}</label>
-      {description}
-      {children}
-      {help}
-    </div>
-  )
-}
+      </g>
+    </g>
+  </Draggable>
+)
