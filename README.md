@@ -1,3 +1,3 @@
 # svg-fun
 
-Describe svg-fun here.
+Random logo generator using SVG
